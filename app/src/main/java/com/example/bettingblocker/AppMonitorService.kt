@@ -1,20 +1,13 @@
 package com.example.bettingblocker
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.util.Log
-import androidx.core.app.NotificationCompat
 
 class AppMonitorService : Service() {
     private val handler = Handler(Looper.getMainLooper())
@@ -23,8 +16,6 @@ class AppMonitorService : Service() {
     private var lastBlockedTime = 0L
     private val blockCooldown = 5000L
     private var lastForegroundApp: String? = null
-    private val CHANNEL_ID = "AppMonitorChannel"
-    private val NOTIFICATION_ID = 1
 
     private val checkRunnable = object : Runnable {
         override fun run() {
@@ -35,10 +26,7 @@ class AppMonitorService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
-        startForeground(NOTIFICATION_ID, createNotification())
         startMonitoring()
-        registerRestartReceiver()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -51,48 +39,6 @@ class AppMonitorService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "App Monitor Service",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Monitors and blocks specified applications"
-            }
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
-        }
-    }
-
-    private fun createNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle("App Monitor Active")
-        .setContentText("Monitoring for blocked applications")
-        .setSmallIcon(android.R.drawable.ic_dialog_info)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .build()
-
-    private fun registerRestartReceiver() {
-        val filter = IntentFilter().apply {
-            addAction(Intent.ACTION_BOOT_COMPLETED)
-            addAction(Intent.ACTION_MY_PACKAGE_REPLACED)
-        }
-        registerReceiver(restartReceiver, filter)
-    }
-
-    private val restartReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == Intent.ACTION_BOOT_COMPLETED ||
-                intent?.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-                val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
-                if (prefs.getBoolean("isMonitoring", false)) {
-                    val serviceIntent = Intent(context, AppMonitorService::class.java)
-                    context?.startService(serviceIntent)
-                }
-            }
-        }
-    }
 
     private fun startMonitoring() {
         val prefs = getSharedPreferences("app_prefs", MODE_PRIVATE)
@@ -145,6 +91,5 @@ class AppMonitorService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(checkRunnable)
-        unregisterReceiver(restartReceiver)
     }
 } 
